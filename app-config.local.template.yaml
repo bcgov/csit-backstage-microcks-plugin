@@ -1,0 +1,18 @@
+# Backstage override configuration for your local development environment
+backend:
+  reading:
+    allow:
+      - host: raw.githubusercontent.com
+
+csitMicrocks:
+  server:
+    baseUrl: https://csit-microcks-apps-gov-bc-ca.dev.api.gov.bc.ca
+
+    auth:
+      type: keycloak
+      issuerUrl: https://authz-b8840c-dev.apps.gold.devops.gov.bc.ca/auth/realms/aps
+      clientId: devhub-microcks-sync
+      # You can get the client secret from the Keycloak admin console
+      clientSecret: ${BASKSTAGE_MICROCKS_CLIENT_SECRET}
+
+        

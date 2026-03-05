@@ -42,7 +42,8 @@
   },
   "resolutions": {
     "@types/react": "^18",
-    "@types/react-dom": "^18"
+    "@types/react-dom": "^18",
+    "@backstage/plugin-catalog-backend@npm:^3.4.0": "patch:@backstage/plugin-catalog-backend@npm%3A3.4.0#~/.yarn/patches/@backstage-plugin-catalog-backend-npm-3.4.0-43308bc85f.patch"
   },
   "prettier": "@backstage/cli/config/prettier",
   "lint-staged": {
@@ -54,5 +55,8 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.4.1",
+  "dependencies": {
+    "openid-client": "^6.8.2"
+  }
 }

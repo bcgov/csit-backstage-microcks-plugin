@@ -1,0 +1,259 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Mock CRA Income Verification Service API
+  version: 0.1.1
+operations:
+  'POST /income-verifications':
+    200_example_sin_123456789:
+      request:
+        body: |
+          {
+            "partnerProgramId": "BC_INCOME_ASSISTANCE",
+            "taxYear": 2024,
+            "consent": {
+              "consentId": "CONSENT-2026-000123",
+              "consentTimestamp": "2026-01-16T18:22:00Z",
+              "consentMethod": "electronic"
+            },
+            "individual": {
+              "sin": "123456789"
+            },
+            "requestedFields": [
+              "netIncome",
+              "maritalStatus"
+            ]
+          }
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            "status": "verified",
+            "taxYear": 2024,
+            "incomeData": {
+              "netIncome": 52340.22,
+              "totalIncome": 61200.00,
+              "maritalStatus": "married",
+              "spouseNetIncome": 12023423.34,
+              "numberOfDependents": 1
+            }
+          }
+
+    200_example_name_paul_howells:
+      request:
+        body: |
+          {
+            "partnerProgramId": "BC_INCOME_ASSISTANCE",
+            "taxYear": 2024,
+            "consent": {
+              "consentId": "CONSENT-2026-000123",
+              "consentTimestamp": "2026-01-16T18:22:00Z",
+              "consentMethod": "electronic"
+            },
+            "individual": {
+              "fullLegalName": "Paul Steven Howells",
+              "birthDate": "1975-06-02"
+            },
+            "requestedFields": [
+              "netIncome",
+              "maritalStatus"
+            ]
+          }
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "ac234287-d972-4d2e-9aef-ce7c02ef58f1",
+            "status": "verified",
+            "taxYear": 2024,
+            "incomeData": {
+              "netIncome": 343977.22,
+              "totalIncome": 375875.00,
+              "maritalStatus": "single",
+              "spouseNetIncome": null,
+              "numberOfDependents": 0
+            }
+          }
+
+    202_example_sin_987654321:
+      request:
+        body: |
+          {
+            "partnerProgramId": "BC_INCOME_ASSISTANCE",
+            "taxYear": 2024,
+            "consent": {
+              "consentId": "CONSENT-2026-000123",
+              "consentTimestamp": "2026-01-16T18:22:00Z",
+              "consentMethod": "electronic"
+            },
+            "individual": {
+              "sin": "987654321"
+            },
+            "requestedFields": [
+              "netIncome",
+              "maritalStatus"
+            ]
+          }
+      response:
+        status: 202
+        headers:
+          Location: "{{ mockUrl() }}/income-verifications/40dc7cb6-7179-4532-922e-8e307caecd34"
+        body: |
+          {
+            "verificationId": "40dc7cb6-7179-4532-922e-8e307caecd34",
+            "status": "pending",
+            "message": "Verification request accepted and queued for processing"
+          }
+
+    400_example_missing_required_fields:
+      request:
+        body: |
+          {
+            "partnerProgramId": "BC_INCOME_ASSISTANCE",
+            "taxYear": 2024,
+            "consent": {
+              "consentId": "CONSENT-2026-000123",
+              "consentTimestamp": "2026-01-16T18:22:00Z",
+              "consentMethod": "electronic"
+            },
+            "individual": {
+              "fullLegalName": "",
+              "birthDate": "1975-06-02"
+            },
+            "requestedFields": [
+              "netIncome",
+              "maritalStatus"
+            ]
+          }
+      response:
+        status: 400
+        body: |
+          {
+            "type": "tag:validation-errors",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Bad Request",
+            "instance": "/income-verifications",
+            "errors": [
+              {
+                "location": "body",
+                "code": "SIN_OR_NAME AND DOB_REQUIRED",
+                "message": "A SIN or Full Name and DOB is required",
+                "type": "tag:validation-error",
+                "pointer": "#/lineNumbers/0",
+                "received": ""
+              }
+            ]
+          }
+
+    500_example_internal_server_error:
+      request:
+        body: |
+          {
+            "partnerProgramId": "BC_INCOME_ASSISTANCE",
+            "taxYear": 2024,
+            "consent": {
+              "consentId": "CONSENT-2026-000123",
+              "consentTimestamp": "2026-01-16T18:22:00Z",
+              "consentMethod": "electronic"
+            },
+            "individual": {
+              "sin": "666666666"
+            },
+            "requestedFields": [
+              "netIncome",
+              "maritalStatus"
+            ]
+          }
+      response:
+        status: 500
+        body: |
+          {
+            "error": "Internal Server Error",
+            "message": "Sorry, this is not working properly.  We now know about this mistake and are working to fix it.",
+            "details": {
+              "correlationId": "a20044a7-2796-4b1c-b346-0c9054372470"
+            }
+          }
+
+  'GET /income-verifications/{verificationId}':
+    200_example_d290f1ee-6c54-4b01-90e6-d701748f0851:
+      request:
+        parameters:
+          verificationId: d290f1ee-6c54-4b01-90e6-d701748f0851
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            "status": "verified",
+            "taxYear": 2024,
+            "incomeData": {
+              "netIncome": 52340.22,
+              "totalIncome": 61200.00,
+              "maritalStatus": "married",
+              "spouseNetIncome": 12023423.34,
+              "numberOfDependents": 1
+            }
+          }
+
+    200_example_ac234287-d972-4d2e-9aef-ce7c02ef58f1:
+      request:
+        parameters:
+          verificationId: ac234287-d972-4d2e-9aef-ce7c02ef58f1
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "ac234287-d972-4d2e-9aef-ce7c02ef58f1",
+            "status": "verified",
+            "taxYear": 2024,
+            "incomeData": {
+              "netIncome": 343977.22,
+              "totalIncome": 375875.00,
+              "maritalStatus": "single",
+              "spouseNetIncome": null,
+              "numberOfDependents": 0
+            }
+          }
+
+    200_example_40dc7cb6-7179-4532-922e-8e307caecd34:
+      request:
+        parameters:
+          verificationId: 40dc7cb6-7179-4532-922e-8e307caecd34
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "40dc7cb6-7179-4532-922e-8e307caecd34",
+            "status": "verified",
+            "taxYear": 2024,
+            "incomeData": {
+              "netIncome": 343977.22,
+              "totalIncome": 375875.00,
+              "maritalStatus": "single",
+              "spouseNetIncome": null,
+              "numberOfDependents": 0
+            }
+          }
+
+    200_example_40dc7cb6-7179-4532-922e-8e307caecd34_pending:
+      request:
+        parameters:
+          verificationId: 40dc7cb6-7179-4532-922e-8e307caecd34
+      response:
+        status: 200
+        body: |
+          {
+            "verificationId": "40dc7cb6-7179-4532-922e-8e307caecd34",
+            "status": "pending"
+          }
+
+    404_example_verification_id_not_found:
+      request:
+        parameters:
+          verificationId: unknown-id   # fallback / non-matching value
+      response:
+        status: 404
+        body: {}

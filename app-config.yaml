@@ -93,6 +93,11 @@ catalog:
       target: ../../examples/org.yaml
       rules:
         - allow: [User, Group]
+    # Microcks plugin example API data
+    - type: file
+      target: ${PWD}/plugins/csit-microcks-backend/examples/seed-catalog-info.yaml
+      rules:
+        - allow: [Location, Component, API]
 
     ## Uncomment these lines to add more example data
     # - type: url
@@ -111,3 +116,13 @@ kubernetes:
 permission:
   # setting this to `false` will disable permissions
   enabled: true
+
+csitMicrocks:
+  server:
+    baseUrl: ${MICROCKS_BASE_URL}
+
+    auth:
+      type: keycloak
+      issuerUrl: ${KEYCLOAK_ISSUER_URL}
+      clientId: ${BACKSTAGE_MICROCKS_CLIENT_ID}
+      clientSecret: ${BASKSTAGE_MICROCKS_CLIENT_SECRET}

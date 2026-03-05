@@ -1,0 +1,20 @@
+apiVersion: bcgov.dev/v1alpha1
+kind: MicrocksSync
+
+spec:
+  mocks:
+    - mockId: swagger
+      artifacts:
+        - kind: examples
+          path: ./microcks/swagger/microcks-Examples.yaml
+        - kind: metadata
+          path: ./microcks/swagger/microcks-Metadata.yaml
+    - mockId: sdpr
+      includeInSwagger: false
+      openapi:
+        path: ./microcks/sdpr/openapi.yaml
+      artifacts:
+        - kind: examples
+          path: ./microcks/sdpr/microcks-Examples.yaml
+        - kind: metadata
+          path: ./microcks/sdpr/microcks-Metadata.yaml

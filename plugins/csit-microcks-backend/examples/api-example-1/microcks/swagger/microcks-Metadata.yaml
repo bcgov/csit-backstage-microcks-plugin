@@ -1,0 +1,86 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIMetadata
+metadata:
+  name: Mock CRA Income Verification Service API
+  version: 0.1.1
+  labels:                # ← Add this block (can be empty {} or with values)
+    env: dev             # optional example values
+    team: api-governance
+    project: cra-income
+operations:
+  'POST /income-verifications':
+    dispatcher: JS
+    dispatcherRules: |
+      try {
+          // Get raw request body
+          const body = mockRequest.requestContent();
+          log.info("RAW REQUEST BODY: " + body);
+
+          // Parse JSON body
+          const parsed = JSON.parse(body);
+          const ind = parsed.individual;
+          log.info("/individual extracted: " + JSON.stringify(ind));
+
+          // Matching logic based on extracted /individual
+          if (ind?.sin === "123456789") {
+              return "200_example_sin_123456789";
+          }
+          if (ind?.sin === "987654321") {
+              return "202_example_sin_987654321";
+          }
+          if (ind?.sin === "666666666") {
+              return "500_example_internal_server_error";
+          }
+
+          if (ind?.fullLegalName === "Paul Steven Howells" && ind?.birthDate === "1975-06-02") {
+              return "200_example_name_paul_howells";
+          }
+
+          if (ind?.fullLegalName === "") {
+              return "400_example_missing_required_fields";
+          }
+
+          // Fallback to 404
+          return "404_example_individual_not_found";
+
+      } catch (err) {
+          log.error("Error in JS dispatcher: " + err);
+          return "500_example_internal_server_error";
+      }
+
+  'GET /income-verifications/{verificationId}':
+    dispatcher: JS
+    dispatcherRules: |
+      // Get the verificationId from the path
+      const verificationId = mockRequest.getURIParameter("verificationId") || "unknown";
+
+      if (verificationId === "d290f1ee-6c54-4b01-90e6-d701748f0851") {
+        return "200_example_d290f1ee-6c54-4b01-90e6-d701748f0851";
+      } else if (verificationId === "ac234287-d972-4d2e-9aef-ce7c02ef58f1") {
+        return "200_example_ac234287-d972-4d2e-9aef-ce7c02ef58f1";
+      } else if (verificationId === "40dc7cb6-7179-4532-922e-8e307caecd34") {
+        // Time-based logic for pending/verified on this ID
+        const timeKey = "first-time-" + verificationId;
+        let firstTime = store.get(timeKey);
+        firstTime = firstTime ? parseInt(firstTime, 10) : 0;
+
+        const now = Date.now();
+
+        if (firstTime === 0) {
+          firstTime = now;
+          store.put(timeKey, firstTime.toString(), 120);
+        }
+
+        const elapsed = (now - firstTime) / 1000;
+
+        if (elapsed >= 60) {
+          store.put(timeKey, now.toString(), 120);
+        } else if (elapsed >= 30) {
+          return "200_example_40dc7cb6-7179-4532-922e-8e307caecd34"
+        }
+
+        return "200_example_40dc7cb6-7179-4532-922e-8e307caecd34_pending"
+      } else {
+        // Fallback for any other ID
+        return "404_example_verification_id_not_found";
+      }
