@@ -5,6 +5,14 @@ type EventLevel = 'debug' | 'info' | 'warn' | 'error';
 export class MicrocksSyncStore {
   constructor(private readonly db: Knex) {}
 
+  private truncateMessage(message: string, max = 4000): string {
+    return message.length > max ? `${message.slice(0, max)}…` : message;
+  }
+
+  private normalizeErrorMessage(message: string): string {
+    return this.truncateMessage(message.trim() || 'Unknown error');
+  }
+
   async upsertSyncRecord(input: {
     entityRef: string;
     mockId: string;
@@ -229,13 +237,14 @@ export class MicrocksSyncStore {
       }
 
       const completedAt = new Date();
+      const normalizedMessage = message ? this.normalizeErrorMessage(message) : null;
 
       await trx('csit_microcks_sync_status')
         .where({ id })
         .update({
           status: 'completed',
           last_success_at: completedAt,
-          last_message: message ?? null,
+          last_message: normalizedMessage,
           next_attempt_at: null,
           last_error: null,
           leased_at: null,
@@ -252,7 +261,7 @@ export class MicrocksSyncStore {
             : 'sync.reconcile_completed',
         level: 'info',
         message:
-          message ??
+          normalizedMessage ??
           (row.desired_action === 'delete'
             ? `Completed delete for mock '${row.mock_id}'`
             : `Completed reconcile for mock '${row.mock_id}'`),
@@ -276,12 +285,15 @@ export class MicrocksSyncStore {
         return;
       }
 
+      const normalizedMessage = this.normalizeErrorMessage(message);
+
       await trx('csit_microcks_sync_status')
         .where({ id })
         .update({
           status: 'error',
-          last_message: message,
-          last_error: message,
+          last_message: normalizedMessage,
+          last_error: normalizedMessage,
+          last_attempt_at: new Date(),
           leased_at: null,
           lease_expires_at: null,
         });
@@ -292,7 +304,7 @@ export class MicrocksSyncStore {
         syncStatusId: row.id,
         eventType: 'sync.error',
         level: 'error',
-        message,
+        message: normalizedMessage,
         details: {
           desiredAction: row.desired_action,
           attemptCount: row.attempt_count,
@@ -308,17 +320,26 @@ export class MicrocksSyncStore {
     return Math.min(seconds, 15 * 60);
   }
 
-  async markRetryableError(id: number, message: string) {
-    await this.db.transaction(async trx => {
+  async markRetryableError(id: number, message: string): Promise<{
+    nextAttemptCount: number;
+    backoffSeconds: number;
+    nextAttemptAt: string;
+  } | undefined> {
+    return this.db.transaction(async trx => {
       const row = await trx('csit_microcks_sync_status')
         .where({ id })
         .first('*');
 
-      const prev = Number(row?.attempt_count ?? 0);
+      if (!row) {
+        return undefined;
+      }
+
+      const prev = Number(row.attempt_count ?? 0);
       const nextAttemptCount = prev + 1;
 
       const backoffSeconds = this.computeBackoffSeconds(nextAttemptCount);
       const nextAttemptAt = new Date(Date.now() + backoffSeconds * 1000);
+      const normalizedMessage = this.normalizeErrorMessage(message);
 
       await trx('csit_microcks_sync_status')
         .where({ id })
@@ -326,16 +347,12 @@ export class MicrocksSyncStore {
           status: 'pending',
           attempt_count: nextAttemptCount,
           next_attempt_at: nextAttemptAt,
-          last_message: message,
-          last_error: message,
+          last_message: normalizedMessage,
+          last_error: normalizedMessage,
           last_attempt_at: new Date(),
           leased_at: null,
           lease_expires_at: null,
         });
-
-      if (!row) {
-        return;
-      }
 
       await this.insertEvent(trx, {
         entityRef: row.entity_ref,
@@ -343,7 +360,7 @@ export class MicrocksSyncStore {
         syncStatusId: row.id,
         eventType: 'sync.retry_scheduled',
         level: 'warn',
-        message,
+        message: normalizedMessage,
         details: {
           desiredAction: row.desired_action,
           previousAttemptCount: prev,
@@ -353,6 +370,12 @@ export class MicrocksSyncStore {
           microcksVersionId: row.microcks_version_id,
         },
       });
+
+      return {
+        nextAttemptCount,
+        backoffSeconds,
+        nextAttemptAt: nextAttemptAt.toISOString(),
+      };
     });
   }
 
@@ -366,12 +389,15 @@ export class MicrocksSyncStore {
         return;
       }
 
+      const normalizedMessage = message ? this.normalizeErrorMessage(message) : null;
+
       await trx('csit_microcks_sync_status')
         .where({ id })
         .update({
           leased_at: null,
           lease_expires_at: null,
-          last_message: message ?? null,
+          last_message: normalizedMessage ?? row.last_message ?? null,
+          last_error: normalizedMessage ?? row.last_error ?? null,
         });
 
       await this.insertEvent(trx, {
@@ -379,8 +405,8 @@ export class MicrocksSyncStore {
         mockId: row.mock_id,
         syncStatusId: row.id,
         eventType: 'sync.lease_cleared',
-        level: 'info',
-        message: message ?? `Cleared lease for mock '${row.mock_id}'`,
+        level: normalizedMessage ? 'error' : 'info',
+        message: normalizedMessage ?? `Cleared lease for mock '${row.mock_id}'`,
         details: {
           desiredAction: row.desired_action,
           attemptCount: row.attempt_count,
@@ -400,10 +426,12 @@ export class MicrocksSyncStore {
         return;
       }
 
+      const normalizedMessage = this.normalizeErrorMessage(message);
+
       await trx('csit_microcks_sync_status')
         .where({ id })
         .update({
-          last_message: message,
+          last_message: normalizedMessage,
           last_attempt_at: new Date(),
         });
 
@@ -413,7 +441,7 @@ export class MicrocksSyncStore {
         syncStatusId: row.id,
         eventType: 'sync.progress',
         level: 'info',
-        message,
+        message: normalizedMessage,
         details: {
           desiredAction: row.desired_action,
           attemptCount: row.attempt_count,
@@ -468,7 +496,7 @@ export class MicrocksSyncStore {
       sync_status_id: input.syncStatusId ?? null,
       event_type: input.eventType,
       level: input.level ?? 'info',
-      message: input.message,
+      message: this.normalizeErrorMessage(input.message),
       details_json:
         input.details === undefined ? null : JSON.stringify(input.details),
       created_at: new Date(),

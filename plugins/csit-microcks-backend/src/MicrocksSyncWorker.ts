@@ -140,20 +140,61 @@ export class MicrocksSyncWorker {
     return Date.now() < this.globalBackoffUntilMs;
   }
 
+  private isRetryableMicrocksAuthorizationError(error: unknown): boolean {
+    if (error instanceof MicrocksUnauthorizedError) {
+      return true;
+    }
+
+    const msg = error instanceof Error ? error.message : String(error);
+
+    return (
+      msg.includes('HTTP 401') ||
+      msg.includes('HTTP 403') ||
+      msg.includes('Failed to list Microcks services') ||
+      msg.includes('Failed to upload Microcks artifact') ||
+      msg.includes('Failed to delete Microcks service')
+    );
+  }
+
   private async handleClaimedRecord(
     record: ClaimedSyncRecord,
   ) {
+    this.logger.info(
+      `[csit-microcks-sync-worker] starting sync entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id} desiredAction=${record.desired_action}`,
+    );
+
     const token = await this.tokenProvider.getAccessToken();
 
     this.clearGlobalBackoffOnSuccess();
 
     await this.jobRunner.execute(record, token);
+
+    this.logger.info(
+      `[csit-microcks-sync-worker] sync completed entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id} desiredAction=${record.desired_action}`,
+    );
   }
 
   private async handleClaimedRecordError(
     record: ClaimedSyncRecord,
     e: unknown,
   ) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error && e.stack ? e.stack : undefined;
+
+    this.logger.error(
+      [
+        '[csit-microcks-sync-worker] sync failed',
+        `entity=${record.entity_ref}`,
+        `mock=${record.mock_id}`,
+        `version=${record.microcks_version_id}`,
+        `desiredAction=${record.desired_action}`,
+        `error=${msg}`,
+        stack ? `stack=${stack}` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+
     if (e instanceof MicrocksTokenAcquisitionError) {
       this.enterGlobalBackoff('token_acquisition_failed', e.message);
 
@@ -179,33 +220,53 @@ export class MicrocksSyncWorker {
       return;
     }
 
-    if (e instanceof MicrocksUnauthorizedError) {
-      this.tokenProvider.clearCache();
-      this.enterGlobalBackoff('microcks_401', e.message);
+    if (this.isRetryableMicrocksAuthorizationError(e)) {
+      if (e instanceof MicrocksUnauthorizedError) {
+        this.tokenProvider.clearCache();
+      }
 
       await this.store.recordEvent({
         entityRef: record.entity_ref,
         mockId: record.mock_id,
         syncStatusId: record.id,
-        eventType: 'worker.global_backoff',
-        level: 'error',
-        message: e.message,
+        eventType: 'worker.retry_scheduled',
+        level: 'warn',
+        message: msg,
         details: {
-          reason: 'microcks_401',
-          globalBackoffAttempts: this.globalBackoffAttempts,
-          globalBackoffUntil: new Date(this.globalBackoffUntilMs).toISOString(),
+          desiredAction: record.desired_action,
+          microcksVersionId: record.microcks_version_id,
+          reason:
+            e instanceof MicrocksUnauthorizedError
+              ? 'microcks_401'
+              : msg.includes('HTTP 403')
+                ? 'microcks_403'
+                : 'microcks_authz_or_authn_failure',
+          stack,
         },
       });
 
-      this.logger.info(
-        `[csit-microcks-sync-worker] releasing lease after global failure entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id}`,
-      );
+      const retry = await this.store.markRetryableError(record.id, msg);
 
-      await this.store.clearLease(record.id, e.message);
+      if (retry) {
+        this.logger.error(
+          [
+            '============================================================',
+            '[csit-microcks-sync-worker] RETRY BACKOFF SCHEDULED',
+            `entity: ${record.entity_ref}`,
+            `mock: ${record.mock_id}`,
+            `version: ${record.microcks_version_id}`,
+            `desiredAction: ${record.desired_action}`,
+            `attempt: ${retry.nextAttemptCount}`,
+            `backoffSeconds: ${retry.backoffSeconds}`,
+            `nextAttemptAt: ${retry.nextAttemptAt}`,
+            `error: ${msg}`,
+            '============================================================',
+          ].join('\n'),
+        );
+      }
+
       return;
     }
-
-    const msg = e instanceof Error ? e.message : String(e);
 
     await this.store.recordEvent({
       entityRef: record.entity_ref,
@@ -217,6 +278,7 @@ export class MicrocksSyncWorker {
       details: {
         desiredAction: record.desired_action,
         microcksVersionId: record.microcks_version_id,
+        stack,
       },
     });
 
@@ -267,7 +329,18 @@ export class MicrocksSyncWorker {
         await this.handleClaimedRecordError(record, e);
       }
     } catch (err) {
-      this.logger.error(`[csit-microcks-sync-worker] worker error: ${err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error && err.stack ? err.stack : undefined;
+
+      this.logger.error(
+        [
+          '[csit-microcks-sync-worker] worker error',
+          `error=${msg}`,
+          stack ? `stack=${stack}` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
     } finally {
       this.running = false;
       this.logger.debug('[csit-microcks-sync-worker] tick end');

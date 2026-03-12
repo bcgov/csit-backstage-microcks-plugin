@@ -26,6 +26,10 @@ export class MicrocksSyncJobRunner {
   ) {}
 
   async execute(record: ClaimedSyncRecord, token: string) {
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] execute start entity=${record.entity_ref} mockId=${record.mock_id} desiredAction=${record.desired_action} version="${record.microcks_version_id}"`,
+    );
+
     if (record.desired_action === 'delete') {
       await this.handleDeleteAction(record, token);
       return;
@@ -45,8 +49,16 @@ export class MicrocksSyncJobRunner {
       [];
     let page = 0;
 
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] scan owned services start desiredVersion="${desiredVersion}" mockId=${mockId} entityVersionPrefix="${entityVersionPrefix}"`,
+    );
+
     for (;;) {
       const items = await this.microcksClient.listServices(page, size, token);
+
+      this.logger.info(
+        `[csit-microcks-sync-job-runner] scan owned services page=${page} size=${size} returned=${items.length}`,
+      );
 
       for (const s of items) {
         const name = typeof s.name === 'string' ? s.name.trim() : '';
@@ -71,6 +83,10 @@ export class MicrocksSyncJobRunner {
       page += 1;
     }
 
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] scan owned services complete desiredVersion="${desiredVersion}" mockId=${mockId} owned=${ownedServices.length}`,
+    );
+
     return ownedServices;
   }
 
@@ -85,7 +101,13 @@ export class MicrocksSyncJobRunner {
       mockId,
     );
 
-    return ownedServices.filter(s => s.version.endsWith(`-${mockId}`));
+    const filtered = ownedServices.filter(s => s.version.endsWith(`-${mockId}`));
+
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] scan owned services for mock desiredVersion="${desiredVersion}" mockId=${mockId} matched=${filtered.length}`,
+    );
+
+    return filtered;
   }
 
   private async uploadDesiredArtifacts(
@@ -125,6 +147,10 @@ export class MicrocksSyncJobRunner {
     );
     const exactMatches = ownedServices.filter(s => s.version === desiredVersion);
 
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] delete exact service scan desiredVersion="${desiredVersion}" mockId=${mockId} exactMatches=${exactMatches.length}`,
+    );
+
     for (const svc of exactMatches) {
       if (!svc.id) {
         throw new Error(
@@ -154,6 +180,10 @@ export class MicrocksSyncJobRunner {
       token,
       desiredVersion,
       mockId,
+    );
+
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] cleanup delete owned services entity=${entityRef} mockId=${mockId} desiredVersion="${desiredVersion}" count=${ownedServices.length} reason=${reason}`,
     );
 
     for (const svc of ownedServices) {
@@ -241,6 +271,7 @@ export class MicrocksSyncJobRunner {
       return await this.desiredStateLoader.load(record.entity_ref, record.mock_id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      const stack = e instanceof Error && e.stack ? e.stack : undefined;
 
       await this.store.recordEvent({
         entityRef: record.entity_ref,
@@ -253,6 +284,7 @@ export class MicrocksSyncJobRunner {
           desiredAction: record.desired_action,
           microcksVersionId: record.microcks_version_id,
           stage: 'desired_state_load',
+          stack,
         },
       });
 
@@ -340,6 +372,10 @@ export class MicrocksSyncJobRunner {
     const desiredVersions = desired.allMockIds.map(
       mockId =>
         `${getEntityVersionPrefix(record.microcks_version_id, desired.mockId)}-${mockId}`,
+    );
+
+    this.logger.info(
+      `[csit-microcks-sync-job-runner] reconcile start entity=${record.entity_ref} mockId=${desired.mockId} desiredApiName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}" desiredVersions=${desiredVersions.join(',')}`,
     );
 
     await this.store.recordEvent({
