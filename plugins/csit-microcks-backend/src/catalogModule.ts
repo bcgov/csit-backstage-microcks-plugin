@@ -38,7 +38,7 @@ export const csitMicrocksCatalogModule = createBackendModule({
         const client = await database.getClient();
 
         const migrationsDir = resolvePackagePath(
-          '@internal/backstage-plugin-csit-microcks-backend',
+          '@bcgov/csit-microcks-backend-backstage-plugin',
           'migrations',
         );
 
