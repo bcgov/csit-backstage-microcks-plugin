@@ -1,43 +1,22 @@
 import type { LoggerService, UrlReaderService } from '@backstage/backend-plugin-api';
 import { CatalogClient } from '@backstage/catalog-client';
-import { parse as parseYaml } from 'yaml';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import {
+  type NormalizedMockConfig,
+  type OpenApiSource,
+  getOpenApiSourceFromEntity,
+  getEntityBaseLocation,
+  isHttpUrl,
+  parseLocationRef,
+  parseMocksConfig,
+  resolveMicrocksYamlTarget,
+  resolveRelativeTarget,
+} from './MicrocksConfigUtils';
 
 const ANNOTATION = 'bcgov/microcks-config-ref';
-const MICROCKS_FILE = 'microcks.yaml';
-
-type MicrocksMockConfig = {
-  mockId?: string;
-  artifacts?: Array<{ kind?: string; path?: string }>;
-  openapi?: { path?: string };
-};
-
-type MicrocksSyncConfig = {
-  spec?: {
-    mocks?: MicrocksMockConfig[];
-  };
-};
-
-type NormalizedMockConfig = {
-  mockId: string;
-  artifacts: Array<{ kind: string; path: string }>;
-  openapiOverridePath?: string;
-};
-
-type LocationRef =
-  | { kind: 'dir'; dir: string }
-  | { kind: 'url'; url: string };
-
-type BaseLocation =
-  | { kind: 'file'; dir: string }
-  | { kind: 'url'; baseUrl: URL };
-
-type OpenApiSource =
-  | { kind: 'inline'; text: string }
-  | { kind: 'url'; url: string };
 
 export type StagedArtifact = {
   filename: string;
@@ -95,198 +74,8 @@ function errorMessage(e: unknown): string {
   return String(e);
 }
 
-function isHttpUrl(value: string): boolean {
-  return value.startsWith('http://') || value.startsWith('https://');
-}
-
 function sha256(text: string): string {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
-}
-
-function parseLocationRef(value: string): LocationRef {
-  const trimmed = value.trim();
-
-  if (trimmed.startsWith('dir:')) {
-    const dir = trimmed.slice('dir:'.length).trim();
-    if (!dir) throw new Error(`Invalid value "${value}" (missing dir path)`);
-    return { kind: 'dir', dir };
-  }
-
-  if (trimmed.startsWith('url:')) {
-    const url = trimmed.slice('url:'.length).trim();
-    if (!url) throw new Error(`Invalid value "${value}" (missing url)`);
-    return { kind: 'url', url };
-  }
-
-  throw new Error(`Invalid value "${value}" (must start with "dir:" or "url:")`);
-}
-
-function normalizeSafeRelativeDir(dir: string): string {
-  const normalized = path.posix.normalize(dir);
-
-  if (
-    normalized.startsWith('/') ||
-    normalized.startsWith('..') ||
-    normalized.includes('/../')
-  ) {
-    throw new Error(`Invalid dir reference "${dir}"`);
-  }
-
-  return normalized;
-}
-
-function getEntityBaseLocation(entity: any): BaseLocation {
-  const loc =
-    entity?.metadata?.annotations?.['backstage.io/managed-by-location'] ??
-    entity?.metadata?.annotations?.['backstage.io/source-location'];
-
-  if (!loc || typeof loc !== 'string') {
-    throw new Error(
-      'Entity is missing backstage.io/managed-by-location or backstage.io/source-location annotation',
-    );
-  }
-
-  if (loc.startsWith('file:')) {
-    const p = loc.slice('file:'.length);
-    return { kind: 'file', dir: path.dirname(p) };
-  }
-
-  if (loc.startsWith('url:')) {
-    const u = new URL(loc.slice('url:'.length));
-    u.pathname = u.pathname.endsWith('/')
-      ? u.pathname
-      : u.pathname.replace(/\/[^/]*$/, '/');
-    return { kind: 'url', baseUrl: u };
-  }
-
-  if (isHttpUrl(loc)) {
-    const u = new URL(loc);
-    u.pathname = u.pathname.endsWith('/')
-      ? u.pathname
-      : u.pathname.replace(/\/[^/]*$/, '/');
-    return { kind: 'url', baseUrl: u };
-  }
-
-  throw new Error(`Unsupported entity base location format: "${loc}"`);
-}
-
-function resolveMicrocksYamlTarget(base: BaseLocation, ref: LocationRef): string {
-  if (ref.kind === 'dir') {
-    const safeDir = normalizeSafeRelativeDir(ref.dir);
-
-    if (base.kind === 'file') {
-      return path.join(base.dir, safeDir, MICROCKS_FILE);
-    }
-
-    const u = new URL(base.baseUrl.toString());
-    const dirPart =
-      safeDir === '.'
-        ? ''
-        : safeDir.replace(/^\.\//, '').replace(/\/?$/, '/');
-    u.pathname = u.pathname + dirPart + MICROCKS_FILE;
-    return u.toString();
-  }
-
-  const baseUrl = new URL(ref.url);
-  if (!baseUrl.pathname.endsWith('/')) baseUrl.pathname += '/';
-  baseUrl.pathname += MICROCKS_FILE;
-  return baseUrl.toString();
-}
-
-function baseDirOfTarget(target: string): string {
-  if (isHttpUrl(target)) {
-    const u = new URL(target);
-    u.pathname = u.pathname.endsWith('/')
-      ? u.pathname
-      : u.pathname.replace(/\/[^/]*$/, '/');
-    return u.toString();
-  }
-  return path.dirname(target);
-}
-
-function resolveRelativeTarget(baseTarget: string, relOrAbs: string): string {
-  const v = (relOrAbs ?? '').trim();
-  if (!v) return v;
-
-  if (isHttpUrl(v)) return v;
-
-  if (isHttpUrl(baseTarget)) {
-    const baseDir = new URL(baseDirOfTarget(baseTarget));
-    return new URL(v, baseDir).toString();
-  }
-
-  const baseDir = baseDirOfTarget(baseTarget);
-  return path.resolve(baseDir, v);
-}
-
-function getOpenApiSourceFromEntity(entity: any): OpenApiSource | undefined {
-  const def = entity?.spec?.definition;
-
-  if (typeof def === 'string' && def.trim()) {
-    const v = def.trim();
-    if (isHttpUrl(v)) return { kind: 'url', url: v };
-    return { kind: 'inline', text: v };
-  }
-
-  const text = def?.$text;
-  if (typeof text === 'string' && text.trim()) {
-    const v = text.trim();
-    if (isHttpUrl(v)) return { kind: 'url', url: v };
-    return { kind: 'inline', text: v };
-  }
-
-  return undefined;
-}
-
-function normalizeNonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function parseMocksConfig(text: string): NormalizedMockConfig[] {
-  const cfg = parseYaml(text) as MicrocksSyncConfig;
-  const rawMocks = cfg?.spec?.mocks;
-
-  if (!Array.isArray(rawMocks) || rawMocks.length === 0) {
-    throw new Error(`Missing required spec.mocks array`);
-  }
-
-  const mocks = rawMocks.map((raw, index) => {
-    const mockId = normalizeNonEmptyString(raw?.mockId);
-    if (!mockId) {
-      throw new Error(`spec.mocks[${index}].mockId is required`);
-    }
-
-    const artifacts = (raw?.artifacts ?? [])
-      .map(a => ({
-        kind: String(a?.kind ?? '').trim(),
-        path: String(a?.path ?? '').trim(),
-      }))
-      .filter(a => a.kind && a.path);
-
-    const openapiOverridePath =
-      normalizeNonEmptyString(raw?.openapi?.path) ?? undefined;
-
-    return {
-      mockId,
-      artifacts,
-      openapiOverridePath,
-    };
-  });
-
-  const seen = new Set<string>();
-  for (const mock of mocks) {
-    if (seen.has(mock.mockId)) {
-      throw new Error(`Duplicate mockId "${mock.mockId}" in spec.mocks`);
-    }
-    seen.add(mock.mockId);
-  }
-
-  return mocks;
 }
 
 export class MicrocksDesiredStateLoader {

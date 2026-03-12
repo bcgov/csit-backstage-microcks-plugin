@@ -1,12 +1,6 @@
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import fs from 'fs/promises';
-
-type FetchWithTimeout = (
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  label: string,
-) => Promise<Response>;
+import type { FetchWithTimeout } from './HttpUtils';
 
 type GetMicrocksBaseUrl = () => string;
 

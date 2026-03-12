@@ -10,6 +10,7 @@ import {
   getMicrocksServerConfig,
   hasMicrocksConfig,
 } from './MicrocksConfig';
+import { fetchWithTimeout } from './HttpUtils';
 import {
   MicrocksTokenAcquisitionError,
   MicrocksTokenProvider,
@@ -52,22 +53,14 @@ export class MicrocksSyncWorker {
     this.microcksClient = new MicrocksClient(
       this.logger,
       () => getMicrocksServerConfig(this.config).baseUrl,
-      async (url, init, timeoutMs, label) => {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), timeoutMs);
-
-        try {
-          return await fetch(url, { ...init, signal: controller.signal });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          throw new Error(`${label} failed: ${msg}`);
-        } finally {
-          clearTimeout(t);
-        }
-      },
+      fetchWithTimeout,
     );
 
-    this.tokenProvider = new MicrocksTokenProvider(this.logger, this.config);
+    this.tokenProvider = new MicrocksTokenProvider(
+      this.logger,
+      this.config,
+      fetchWithTimeout,
+    );
 
     this.desiredStateLoader = new MicrocksDesiredStateLoader(
       this.logger,

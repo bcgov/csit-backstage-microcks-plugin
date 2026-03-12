@@ -1,5 +1,6 @@
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import type { Config } from '@backstage/config';
+import type { FetchWithTimeout } from './HttpUtils';
 import {
   getMicrocksServerConfig,
   isKeycloakAuth,
@@ -34,31 +35,13 @@ function errorMessage(e: unknown): string {
   return String(e);
 }
 
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  label: string,
-): Promise<Response> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (e) {
-    const msg = errorMessage(e);
-    throw new Error(`${label} failed: ${msg}`);
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 export class MicrocksTokenProvider {
   private tokenCache?: CachedAccessToken;
 
   constructor(
     private readonly logger: LoggerService,
     private readonly config: Config,
+    private readonly fetchWithTimeout: FetchWithTimeout,
   ) {}
 
   clearCache() {
@@ -93,7 +76,7 @@ export class MicrocksTokenProvider {
       );
 
       const discoveryUrl = issuerUrl.replace(/\/$/, '') + '/.well-known/openid-configuration';
-      const discoveryResp = await fetchWithTimeout(
+      const discoveryResp = await this.fetchWithTimeout(
         discoveryUrl,
         { method: 'GET', headers: { Accept: 'application/json' } },
         10_000,
@@ -121,7 +104,7 @@ export class MicrocksTokenProvider {
       form.set('client_id', cfg.auth.clientId);
       form.set('client_secret', cfg.auth.clientSecret);
 
-      const tokenResp = await fetchWithTimeout(
+      const tokenResp = await this.fetchWithTimeout(
         tokenEndpoint,
         {
           method: 'POST',
