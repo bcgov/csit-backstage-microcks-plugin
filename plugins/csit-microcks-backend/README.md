@@ -352,12 +352,13 @@ Example:
 
 ```yaml
 csitMicrocks:
-  baseUrl: https://microcks.example.com
-  auth:
-    type: keycloak
-    tokenUrl: https://keycloak.example.com/realms/example/protocol/openid-connect/token
-    clientId: backstage
-    clientSecret: ${MICROCKS_CLIENT_SECRET}
+  server:
+    baseUrl: https://csit-microcks-apps-gov-bc-ca.dev.api.gov.bc.ca
+    auth:
+      type: keycloak
+      issuerUrl: https://authz-b8840c-dev.apps.gold.devops.gov.bc.ca/auth/realms/aps
+      clientId: devhub-microcks-sync
+      clientSecret: ${BACKSTAGE_MICROCKS_CLIENT_SECRET}
 ```
 
 If this configuration is missing:

@@ -13,6 +13,6 @@ csitMicrocks:
       issuerUrl: https://authz-b8840c-dev.apps.gold.devops.gov.bc.ca/auth/realms/aps
       clientId: devhub-microcks-sync
       # You can get the client secret from the Keycloak admin console
-      clientSecret: ${BASKSTAGE_MICROCKS_CLIENT_SECRET}
+      clientSecret: ${BACKSTAGE_MICROCKS_CLIENT_SECRET}
 
         

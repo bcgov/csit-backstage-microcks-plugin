@@ -125,4 +125,4 @@ csitMicrocks:
       type: keycloak
       issuerUrl: ${KEYCLOAK_ISSUER_URL}
       clientId: ${BACKSTAGE_MICROCKS_CLIENT_ID}
-      clientSecret: ${BASKSTAGE_MICROCKS_CLIENT_SECRET}
+      clientSecret: ${BACKSTAGE_MICROCKS_CLIENT_SECRET}
