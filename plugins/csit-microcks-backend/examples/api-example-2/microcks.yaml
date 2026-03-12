@@ -1,0 +1,6 @@
+apiVersion: bcgov.dev/v1alpha1
+kind: MicrocksSync
+
+spec:
+  mocks:
+    - mockId: swagger

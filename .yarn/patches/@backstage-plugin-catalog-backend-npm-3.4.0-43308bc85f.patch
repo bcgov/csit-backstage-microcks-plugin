@@ -1,0 +1,61 @@
+diff --git a/dist/processors/PlaceholderProcessor.cjs.js b/dist/processors/PlaceholderProcessor.cjs.js
+index aff5459d4367e2e32f5231aec83b08c486853aa2..f6b822353fd8fd10eb507e87f88ea7b5767ed891 100644
+--- a/dist/processors/PlaceholderProcessor.cjs.js
++++ b/dist/processors/PlaceholderProcessor.cjs.js
+@@ -2,6 +2,9 @@
+ 
+ var yaml = require('yaml');
+ var pluginCatalogNode = require('@backstage/plugin-catalog-node');
++var fs = require('fs/promises');
++var path = require('path');
++var url = require('url');
+ 
+ function _interopDefaultCompat (e) { return e && typeof e === 'object' && 'default' in e ? e : { default: e }; }
+ 
+@@ -41,13 +44,16 @@ class PlaceholderProcessor {
+       if (!resolver) {
+         return [data, false];
+       }
+-      const read = async (url) => {
+-        const response = await this.options.reader.readUrl(url);
++      const read = async (target) => {
++        if (isFileUrl(target)) {
++          return fs.readFile(url.fileURLToPath(target));
++        }
++        const response = await this.options.reader.readUrl(target);
+         const buffer = await response.buffer();
+         return buffer;
+       };
+-      const resolveUrl = (url, base) => this.options.integrations.resolveUrl({
+-        url,
++      const resolveUrl = (target, base) => this.options.integrations.resolveUrl({
++        url: target,
+         base
+       });
+       return [
+@@ -131,6 +137,12 @@ function relativeUrl({
+     );
+   }
+   try {
++    if (isAbsoluteFilesystemPath(baseUrl) || isFileUrl(baseUrl)) {
++      const normalizedBaseUrl = isFileUrl(baseUrl)
++        ? baseUrl
++        : url.pathToFileURL(baseUrl).toString();
++      return new url.URL(value, normalizedBaseUrl).toString();
++    }
+     return resolveUrl(value, baseUrl);
+   } catch (e) {
+     throw new Error(
+@@ -138,6 +150,12 @@ function relativeUrl({
+     );
+   }
+ }
++function isFileUrl(value) {
++  return typeof value === "string" && value.startsWith("file:");
++}
++function isAbsoluteFilesystemPath(value) {
++  return typeof value === "string" && path.isAbsolute(value);
++}
+ 
+ exports.PlaceholderProcessor = PlaceholderProcessor;
+ exports.jsonPlaceholderResolver = jsonPlaceholderResolver;

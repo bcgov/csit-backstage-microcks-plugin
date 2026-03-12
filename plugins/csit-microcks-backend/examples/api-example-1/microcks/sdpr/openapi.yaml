@@ -1,0 +1,477 @@
+openapi: 3.1.0
+
+info:
+  title: This title is not used to generate the mocks
+  description: |
+    Mock API simulating access to Canada Revenue Agency (CRA) income verification data.
+    using either SIN **or** full name + date of birth, for a given tax year.
+
+    **Identification rules**:
+    - Either `sin` OR both `fullName` + `birthDate` must be provided
+    - Requests are atomic, partial results are never returned
+
+    Consent is accepted based on partner attestation only (no central registry exists).
+  version: 0.1.1
+
+tags:
+  - name: Income Verification
+    description: Endpoints for requesting and retrieving income verification results
+
+servers:
+  - url: https://dev.api.cra-income-verification.ca/v1
+    description: Development environment using dynamic test data for testing and development purposes
+
+paths:
+  /income-verifications:
+    post:
+      summary: Request income verification
+      description: |
+        Submits an income verification request for an individual who has provided consent.
+        Returns verified income data if a matching taxpayer record is found.
+        Consent is accepted on the basis of partner attestation; no runtime validation against a central registry is performed.
+      operationId: createIncomeVerification
+      tags:
+        - Income Verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncomeVerificationRequest'
+      responses:
+        '200':
+          description: Income verification successful - matching record found and data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeVerificationResponse'
+        '202':
+          description: Request accepted for asynchronous processing. The verification is queued/pending. Poll the Location URL to check status.
+          headers:
+            Location:
+              description: URL to poll for the verification status and eventual result (e.g. /income-verifications/{verificationId})
+              schema:
+                type: string
+                format: uri
+                examples:
+                  - https://mock.cra.gov.ca/income-verifications/a0c397d178a8462aaa0fc27c343ff273
+            Retry-After:
+              description: Suggested polling interval in seconds (clients SHOULD respect this to avoid rate limiting)
+              schema:
+                type: integer
+                examples:
+                  - 30
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verificationId:
+                    type: string
+                    format: uuid
+                    description: Unique identifier to poll for status/result
+                  status:
+                    type: string
+                    enum: [pending]
+                    description: Always 'pending' in 202 responses
+                  message:
+                    type: string
+                    description: Human-readable note about the async processing
+                    example: Verification request accepted and queued for processing
+                required:
+                  - verificationId
+                  - status
+                examples:
+                  - verificationId: a0c397d178a8462aaa0fc27c343ff273
+                    status: pending
+                    message: Verification request accepted and queued for processing
+        '400':
+          description: Validation error - request body is malformed, missing required fields, or contains invalid values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetailResponse'
+        '404':
+          description: No matching taxpayer found (only returned synchronously; async cases may later return this via polling)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '500':
+          description: Internal server error - an unexpected error occurred while accepting the request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    IncomeVerificationRequest:
+      type: object
+      description: The payload required to initiate an income verification request
+      required:
+        - partnerProgramId
+        - consent
+        - individual
+        - taxYear
+      properties:
+        partnerProgramId:
+          type: string
+          description: Unique identifier registered for the government program or department making the request
+          example: BC_INCOME_ASSISTANCE
+        taxYear:
+          type: integer
+          description: The taxation year for which income information is requested
+          example: 2024
+        consent:
+          $ref: '#/components/schemas/ConsentInfo'
+          description: Attestation information about the consent obtained from the individual
+        individual:
+          $ref: '#/components/schemas/IndividualIdentity'
+          description: Identifying information for the individual whose income is being verified
+        requestedFields:
+          type: array
+          description: Optional list of specific income fields requested. If omitted, all available fields are returned.
+          items:
+            type: string
+            enum:
+              - netIncome
+              - totalIncome
+              - maritalStatus
+              - spouseNetIncome
+              - numberOfDependents
+          example:
+            - netIncome
+            - maritalStatus
+      examples:
+        - partnerProgramId: BC_INCOME_ASSISTANCE
+          taxYear: 2024
+          consent:
+            consentId: CONSENT-2026-000123
+            consentTimestamp: 2026-01-16T18:22:00Z
+            consentMethod: electronic
+          individual:
+            sin: "123456789"
+          requestedFields:
+            - netIncome
+            - maritalStatus
+
+    IndividualIdentity:
+      type: object
+      description: Identification details of the individual. Either SIN or fullLegalName + birthDate must be provided.
+      oneOf:
+        - required: [sin]
+        - required: [fullLegalName, birthDate]
+      properties:
+        sin:
+          type: string
+          description: Social Insurance Number (exactly 9 digits) - preferred and highest-confidence identification method
+          pattern: ^\d{9}$
+          example: "123456789"
+        fullLegalName:
+          type: string
+          description: Full legal name of the individual (required when SIN is not provided)
+          example: Jane Elizabeth Doe
+        birthDate:
+          type: string
+          format: date
+          description: Date of birth in ISO 8601 format (YYYY-MM-DD) - required when identifying without SIN
+          example: 1985-04-12
+      examples:
+        - sin: "123456789"
+
+    ConsentInfo:
+      type: object
+      description: Information attesting to the individual's consent.
+      required:
+        - consentId
+        - consentTimestamp
+        - consentMethod
+      properties:
+        consentId:
+          type: string
+          description: Unique reference/ID generated by the partner for this specific consent event
+          example: CONSENT-2026-000123
+        consentTimestamp:
+          type: string
+          format: date-time
+          description: UTC timestamp when the individual provided consent
+          example: 2026-01-16T18:22:00Z
+        consentMethod:
+          type: string
+          description: Method by which consent was obtained
+          enum: [electronic, paper, in_person]
+          example: electronic
+      examples:
+        - consentId: CONSENT-2026-000123
+          consentTimestamp: 2026-01-16T18:22:00Z
+          consentMethod: electronic
+
+    IncomeVerificationResponse:
+      type: object
+      description: Response containing the status and (when complete) result of an income verification request
+      required:
+        - verificationId
+        - status
+      properties:
+        verificationId:
+          type: string
+          format: uuid
+          description: Unique identifier for this verification request and its result (used for polling)
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        status:
+          type: string
+          description: Current status of the verification. Poll until no longer 'pending'
+          enum: [pending, verified, no_match, error]
+          example: verified
+        taxYear:
+          type: integer
+          description: The tax year that was requested and processed (present only when status is 'verified')
+          example: 2024
+        incomeData:
+          $ref: '#/components/schemas/IncomeData'
+          description: Verified income information (present only when status is 'verified')
+        errors:
+          type: array
+          description: Problem detail error items describing why the request resulted in an error. (present only when status is 'error')
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProblemDetailErrorItem'
+      examples:
+        - verificationId: d290f1ee-6c54-4b01-90e6-d701748f0851
+          status: verified
+          taxYear: 2024
+          incomeData:
+            netIncome: 52340.22
+            totalIncome: 61200.00
+            maritalStatus: married
+            spouseNetIncome: 0.00
+            numberOfDependents: 1
+
+    IncomeData:
+      type: object
+      description: Verified income and related information from the tax return
+      properties:
+        netIncome:
+          type: number
+          description: Net income amount (Line 23600 of the T1 General return)
+          example: 52340.22
+        totalIncome:
+          type: number
+          description: Total income amount (Line 15000 of the T1 General return)
+          example: 61200.00
+        maritalStatus:
+          type: string
+          description: Marital status as reported on the tax return
+          enum: [single, married, common_law, separated, divorced, widowed]
+          example: married
+        spouseNetIncome:
+          anyOf:
+            - type: number
+            - type: "null"
+          description: Net income of spouse or common-law partner (if applicable)
+          example: 0.00
+        numberOfDependents:
+          type: integer
+          description: Number of eligible dependents claimed on the return
+          example: 1
+      examples:
+        - netIncome: 52340.22
+          totalIncome: 61200.00
+          maritalStatus: married
+          spouseNetIncome: 0.00
+          numberOfDependents: 1
+
+    ProblemDetailResponse:
+      type: object
+      description: Canonical model for problem details as defined by RFC-9457
+      required:
+        - type
+        - title
+        - status
+        - errors
+      properties:
+        type:
+          type: string
+          description: A URI reference that identifies the problem type
+          example: tag:validation-errors
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type
+          example: Bad Request
+        status:
+          type: integer
+          description: A number indicating the HTTP status code generated for this occurrence of the problem
+          example: 400
+        detail:
+          anyOf:
+            - type: string
+            - type: "null"
+          description: A human-readable explanation specific to this occurrence of the problem
+          example: One or more validation errors occurred
+        errors:
+          type: array
+          description: A list of individual error occurrences found, with details and a pointer to the location of each
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ProblemDetailErrorItem'
+      examples:
+        - type: tag:validation-errors
+          title: Bad Request
+          status: 400
+          detail: Invalid line numbers provided
+          instance: /tax-documents/query
+          errors:
+            - location: body
+              code: INVALID_LINE_NUMBER
+              message: Line number does not exist in the document
+              type: tag:validation-error
+              pointer: "#/lineNumbers/0"
+              received: "99999"
+
+    ProblemDetailErrorItem:
+      title: ProblemDetailErrorItem
+      description: >-
+        Represents a single detailed error within a Problem Details response (RFC 9457).
+        Provides granular information about what went wrong in the request, typically used
+        in validation, semantic, or business-rule failures.
+      type: object
+      required:
+        - location
+        - code
+        - message
+        - type
+      properties:
+        location:
+          $ref: '#/components/schemas/ProblemDetailErrorLocation'
+          description: >-
+            The part of the HTTP request where the error occurred (body, query, path, header, etc.).
+            Helps clients quickly locate the problematic input.
+
+        code:
+          type: string
+          title: Code
+          description: >-
+            A machine-readable error code that identifies the specific type of error.
+            Should be stable and documented for programmatic handling.
+            Follows the 'application/problem+json' error code pattern from RFC 9457.
+          example: INVALID_LINE_NUMBER
+
+        message:
+          type: string
+          title: Message
+          description: >-
+            A short, human-readable summary of the error suitable for display to end-users
+            or in logs. Should be clear and concise (RFC 9457 recommends avoiding technical
+            jargon where possible).
+          example: Line number does not exist in the specified document
+
+        type:
+          type: string
+          title: Type
+          description: >-
+            A URI reference or tag that identifies the problem type (RFC 9457 'type' field).
+            Often used to categorize errors (e.g., validation, authorization, business-rule).
+            When using tags instead of URIs, prefix with 'tag:' is a common convention.
+          example: tag:validation-error
+
+        field:
+          title: Field
+          description: >-
+            The name of the specific field/property in the request that caused the error
+            (when applicable). Useful for form-based or structured input validation.
+          anyOf:
+            - type: string
+            - type: "null"
+          example: taxYear
+
+        detail:
+          title: Detail
+          description: >-
+            A more detailed human-readable explanation of the error, providing additional
+            context beyond the short message (maps to RFC 9457 'detail' field).
+            May include contextual information or suggested corrections.
+          anyOf:
+            - type: string
+            - type: "null"
+          example: Line 99999 is not present in T1 General for 2024
+
+        received:
+          title: Received
+          description: >-
+            The actual value received by the server that caused the error
+            (useful for debugging and helping clients understand what was invalid).
+          anyOf:
+            - type: string
+            - type: "null"
+          example: "99999"
+
+        pointer:
+          title: Pointer
+          description: >-
+            JSON Pointer (RFC 6901) to the exact location of the error within the request body
+            (e.g., '#/lineNumbers/0'). Highly recommended for deep/nested validation errors
+            (aligns with RFC 9457 best practices).
+          anyOf:
+            - type: string
+            - type: "null"
+          example: "#/lineNumbers/1"
+
+        constraints:
+          title: Constraints
+          description: >-
+            Optional object containing validation constraint violations
+            (e.g., minLength, pattern, enum values). Keys are constraint names,
+            values are expected values or descriptions.
+            Useful for schema-based validation libraries.
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+          example:
+            minLength: 9
+            pattern: ^\d{9}$
+
+      examples:
+        - code: REQUIRED_FIELD_MISSING
+          detail: One of 'sin' or both 'fullLegalName' and 'birthDate' must be provided
+          field: individual
+          location: body
+          message: Missing required identifier
+          pointer: "#/identifier"
+          received: ""
+          type: tag:validation-error
+
+    ProblemDetailErrorLocation:
+      type: string
+      description: The location on the HTTP request for which a problem has been detected...
+      enum: [body, query, header, path, cookie]
+      examples: [body]
+
+    ErrorResponse:
+      type: object
+      description: Standard error response format for unexpected or server-side errors...
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: A short, machine-readable error code...
+          example: forbidden
+        message:
+          type: string
+          description: A human-readable summary...
+          example: You are not authorized to access this resource
+        details:
+          anyOf:
+            - type: object
+              additionalProperties: true
+          example:
+            correlationId: req-abc123-xyz
+            timestamp: 2026-01-16T19:22:00Z
+      examples:
+        - error: forbidden
+          message: You are not authorized to access this resource
+          details:
+            correlationId: req-abc123-xyz

@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: msp-tombstone-data-api
+  description: Secure API for verifying MSP tombstone data, used for eligibility and fraud prevention in BC programs.
+  tags:
+    - secure-data-exchange
+    - authoritative-data-register
+    - eligibility-factor-verification
+  annotations:
+    bcgov/microcks-config-ref: dir:.
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:platform-team
+  system: income-assistance-system
+  definition:
+    $text: ./openapi/openapi.yaml

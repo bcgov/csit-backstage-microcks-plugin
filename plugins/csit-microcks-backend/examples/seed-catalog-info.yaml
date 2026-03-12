@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+    name: connected-services-examples-seed
+spec:
+    type: file
+    targets:
+        - ./api-example-1/catalog-info.yaml
+        - ./api-example-2/catalog-info.yaml
