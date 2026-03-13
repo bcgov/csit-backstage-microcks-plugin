@@ -148,10 +148,14 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
     location: LocationSpec,
     _emit: CatalogProcessorEmit,
   ): Promise<Entity> {
+    if (entity.kind !== 'API') {
+      return entity;
+    }
+
     const start = Date.now();
     const entityRef = stringifyEntityRef(entity);
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-processor] enter ${this.processorName}.postProcessEntity entity=${entityRef}`,
     );
 
@@ -358,7 +362,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
               versionId,
             );
 
-            this.logger.info(
+            this.logger.debug(
               `[csit-microcks-processor] appended mock server entity=${entityRef} mockId=${mock.mockId} url="${mockServerUrl}"`,
             );
           }
@@ -452,7 +456,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
               if (openapiSource.kind === 'inline') {
                 const openapiInlineHash = sha256(openapiSource.text);
 
-                this.logger.info(
+                this.logger.debug(
                   `[csit-microcks-processor] openapi fingerprint source entity=${entityRef} mockId=${mock.mockId} kind=inline hash=${openapiInlineHash} length=${openapiSource.text.length}`,
                 );
 
@@ -460,7 +464,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
               } else {
                 const target = openapiSource.url;
 
-                this.logger.info(
+                this.logger.debug(
                   `[csit-microcks-processor] openapi fingerprint source entity=${entityRef} mockId=${mock.mockId} kind=url target="${target}"`,
                 );
 
@@ -472,7 +476,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                       const buf = await resp.buffer();
                       const openapiUrlHash = sha256Buffer(buf);
 
-                      this.logger.info(
+                      this.logger.debug(
                         `[csit-microcks-processor] openapi fingerprint url fallback entity=${entityRef} mockId=${mock.mockId} target="${target}" hash=${openapiUrlHash} bytes=${buf.length}`,
                       );
 
@@ -481,7 +485,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                       );
                     } catch (e) {
                       const err = e instanceof Error ? e : new Error(String(e));
-                      this.logger.info(
+                      this.logger.debug(
                         `[csit-microcks-processor] openapi fingerprint url read error entity=${entityRef} mockId=${mock.mockId} target="${target}" error="${err.message}"`,
                       );
                       fingerprintParts.push(
@@ -489,7 +493,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                       );
                     }
                   } else {
-                    this.logger.info(
+                    this.logger.debug(
                       `[csit-microcks-processor] openapi fingerprint url metadata entity=${entityRef} mockId=${mock.mockId} target="${target}" etag="${meta.etag ?? ''}" lastModified="${meta.lastModified ?? ''}" contentLength="${meta.contentLength ?? ''}"`,
                     );
 
@@ -500,7 +504,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                 } else {
                   try {
                     const st = await fs.stat(target);
-                    this.logger.info(
+                    this.logger.debug(
                       `[csit-microcks-processor] openapi fingerprint file metadata entity=${entityRef} mockId=${mock.mockId} path="${target}" size=${st.size} mtimeMs=${st.mtimeMs}`,
                     );
                     fingerprintParts.push(
@@ -508,7 +512,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                     );
                   } catch (e) {
                     const err = e instanceof Error ? e : new Error(String(e));
-                    this.logger.info(
+                    this.logger.debug(
                       `[csit-microcks-processor] openapi fingerprint file stat error entity=${entityRef} mockId=${mock.mockId} path="${target}" error="${err.message}"`,
                     );
                     fingerprintParts.push(
@@ -518,7 +522,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                 }
               }
             } else {
-              this.logger.info(
+              this.logger.debug(
                 `[csit-microcks-processor] openapi fingerprint source entity=${entityRef} mockId=${mock.mockId} kind=none`,
               );
               fingerprintParts.push('openapi:none');
@@ -548,7 +552,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
                 },
               });
 
-              this.logger.info(
+              this.logger.debug(
                 `[csit-microcks-processor] unchanged sync inputs entity=${entityRef} mockId=${mock.mockId} fingerprint=${fingerprintHash} (skipping)`,
               );
               continue;
@@ -570,7 +574,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
             });
 
             this.logger.info(
-              `[csit-microcks-processor] changed sync inputs entity=${entityRef} mockId=${mock.mockId} microcksSource=${microcksTarget} fingerprint=${fingerprintHash}`,
+              `[csit-microcks-processor] change detected entity=${entityRef} mockId=${mock.mockId} microcksSource=${microcksTarget} fingerprint=${fingerprintHash} action=reconcile-required`,
             );
           }
         } catch (e) {
@@ -620,7 +624,7 @@ export class CsitMicrocksProcessor implements CatalogProcessor {
         },
       });
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-processor] exit ${this.processorName}.postProcessEntity entity=${entityRef} durationMs=${ms}`,
       );
     }

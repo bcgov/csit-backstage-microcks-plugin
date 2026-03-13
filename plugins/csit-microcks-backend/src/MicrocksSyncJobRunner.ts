@@ -26,7 +26,7 @@ export class MicrocksSyncJobRunner {
   ) {}
 
   async execute(record: ClaimedSyncRecord, token: string) {
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] execute start entity=${record.entity_ref} mockId=${record.mock_id} desiredAction=${record.desired_action} version="${record.microcks_version_id}"`,
     );
 
@@ -49,14 +49,14 @@ export class MicrocksSyncJobRunner {
       [];
     let page = 0;
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] scan owned services start desiredVersion="${desiredVersion}" mockId=${mockId} entityVersionPrefix="${entityVersionPrefix}"`,
     );
 
     for (;;) {
       const items = await this.microcksClient.listServices(page, size, token);
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-sync-job-runner] scan owned services page=${page} size=${size} returned=${items.length}`,
       );
 
@@ -83,7 +83,7 @@ export class MicrocksSyncJobRunner {
       page += 1;
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] scan owned services complete desiredVersion="${desiredVersion}" mockId=${mockId} owned=${ownedServices.length}`,
     );
 
@@ -103,7 +103,7 @@ export class MicrocksSyncJobRunner {
 
     const filtered = ownedServices.filter(s => s.version.endsWith(`-${mockId}`));
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] scan owned services for mock desiredVersion="${desiredVersion}" mockId=${mockId} matched=${filtered.length}`,
     );
 
@@ -124,7 +124,7 @@ export class MicrocksSyncJobRunner {
       secondaryArtifacts: desired.secondaryArtifacts,
     });
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] uploading ${mode} artifacts entity=${entityRef} mockId=${desired.mockId} mainArtifact="${desired.mainArtifact.filename}" secondaryArtifacts=${desired.secondaryArtifacts.length}`,
     );
 
@@ -147,7 +147,7 @@ export class MicrocksSyncJobRunner {
     );
     const exactMatches = ownedServices.filter(s => s.version === desiredVersion);
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] delete exact service scan desiredVersion="${desiredVersion}" mockId=${mockId} exactMatches=${exactMatches.length}`,
     );
 
@@ -182,7 +182,7 @@ export class MicrocksSyncJobRunner {
       mockId,
     );
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] cleanup delete owned services entity=${entityRef} mockId=${mockId} desiredVersion="${desiredVersion}" count=${ownedServices.length} reason=${reason}`,
     );
 
@@ -234,13 +234,17 @@ export class MicrocksSyncJobRunner {
       },
     });
 
+    this.logger.debug(
+      `[csit-microcks-sync-job-runner] delete start entity=${record.entity_ref} mockId=${record.mock_id} desiredVersion="${record.microcks_version_id}"`,
+    );
+
     const deletedCount = await this.deleteExactServiceIfPresent(
       token,
       record.microcks_version_id,
       record.mock_id,
     );
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] delete result entity=${record.entity_ref} mockId=${record.mock_id} desiredVersion="${record.microcks_version_id}" deleted=${deletedCount}`,
     );
 
@@ -374,7 +378,7 @@ export class MicrocksSyncJobRunner {
         `${getEntityVersionPrefix(record.microcks_version_id, desired.mockId)}-${mockId}`,
     );
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] reconcile start entity=${record.entity_ref} mockId=${desired.mockId} desiredApiName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}" desiredVersions=${desiredVersions.join(',')}`,
     );
 
@@ -408,7 +412,7 @@ export class MicrocksSyncJobRunner {
       mockId: desired.mockId,
     });
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] reconcile entity-owned services desiredName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}" desiredVersions=${desiredVersions.join(',')} owned=${reconciliation.owned.length} delete=${reconciliation.toDelete.length} exactMatches=${reconciliation.exactMatches.length}`,
     );
 
@@ -444,6 +448,16 @@ export class MicrocksSyncJobRunner {
       },
     });
 
+    if (reconciliation.action === 'create') {
+      this.logger.info(
+        `[csit-microcks-sync-job-runner] creating Microcks mock entity=${record.entity_ref} mockId=${desired.mockId} desiredName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}"`,
+      );
+    } else if (reconciliation.action === 'update') {
+      this.logger.info(
+        `[csit-microcks-sync-job-runner] updating Microcks mock entity=${record.entity_ref} mockId=${desired.mockId} desiredName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}"`,
+      );
+    }
+
     for (const svc of reconciliation.toDelete) {
       await this.store.recordEvent({
         entityRef: record.entity_ref,
@@ -459,6 +473,10 @@ export class MicrocksSyncJobRunner {
         },
       });
 
+      this.logger.info(
+        `[csit-microcks-sync-job-runner] deleting stale Microcks service id="${svc.id}" name="${svc.name}" version="${svc.version}"`,
+      );
+
       await this.microcksClient.deleteService(svc.id, token);
     }
 
@@ -471,7 +489,7 @@ export class MicrocksSyncJobRunner {
         );
       }
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-sync-job-runner] deleting existing Microcks service before update id="${exactMatch.id}" name="${exactMatch.name}" version="${exactMatch.version}"`,
       );
 
@@ -519,7 +537,7 @@ export class MicrocksSyncJobRunner {
       await this.recordArtifactUploadFinished(record, desired, 'create');
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-job-runner] reconcile result entity=${record.entity_ref} mockId=${desired.mockId} desiredName="${desired.desiredApiName}" desiredVersion="${record.microcks_version_id}" action=${reconciliation.action}`,
     );
 

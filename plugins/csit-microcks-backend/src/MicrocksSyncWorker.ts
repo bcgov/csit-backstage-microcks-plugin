@@ -126,7 +126,7 @@ export class MicrocksSyncWorker {
     if (this.globalBackoffAttempts === 0 && this.globalBackoffUntilMs === 0) return;
     this.globalBackoffAttempts = 0;
     this.globalBackoffUntilMs = 0;
-    this.logger.info('[csit-microcks-sync-worker] global backoff cleared');
+    this.logger.debug('[csit-microcks-sync-worker] global backoff cleared');
   }
 
   private shouldSkipForGlobalBackoff(): boolean {
@@ -152,7 +152,7 @@ export class MicrocksSyncWorker {
   private async handleClaimedRecord(
     record: ClaimedSyncRecord,
   ) {
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-worker] starting sync entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id} desiredAction=${record.desired_action}`,
     );
 
@@ -162,7 +162,7 @@ export class MicrocksSyncWorker {
 
     await this.jobRunner.execute(record, token);
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-sync-worker] sync completed entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id} desiredAction=${record.desired_action}`,
     );
   }
@@ -205,7 +205,7 @@ export class MicrocksSyncWorker {
         },
       });
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-sync-worker] releasing lease after global failure entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id}`,
       );
 
@@ -297,7 +297,7 @@ export class MicrocksSyncWorker {
       }
 
       if (this.shouldSkipForGlobalBackoff()) {
-        this.logger.info(
+        this.logger.debug(
           `[csit-microcks-sync-worker] skipping tick due to GLOBAL backoff until ${new Date(
             this.globalBackoffUntilMs,
           ).toISOString()}`,
@@ -312,7 +312,7 @@ export class MicrocksSyncWorker {
         return;
       }
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-sync-worker] claimed sync entity=${record.entity_ref} mock=${record.mock_id} version=${record.microcks_version_id} desiredAction=${record.desired_action} leaseExpiresAt=${record.lease_expires_at instanceof Date ? record.lease_expires_at.toISOString() : String(record.lease_expires_at)}`,
       );
 
