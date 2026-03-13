@@ -4,7 +4,7 @@ import {
   resolvePackagePath,
 } from '@backstage/backend-plugin-api';
 import { CatalogClient } from '@backstage/catalog-client';
-import { catalogProcessingExtensionPoint } from '@backstage/plugin-catalog-node';
+import { catalogProcessingExtensionPoint } from '@backstage/plugin-catalog-node/alpha';
 import { CsitMicrocksProcessor } from './CsitMicrocksProcessor';
 import { getMicrocksServerConfig } from './MicrocksConfig';
 import { MicrocksSyncStore } from './MicrocksSyncStore';
@@ -38,7 +38,7 @@ export const csitMicrocksCatalogModule = createBackendModule({
         const client = await database.getClient();
 
         const migrationsDir = resolvePackagePath(
-          '@internal/backstage-plugin-csit-microcks-backend',
+          '@bcgov/csit-microcks-backend-backstage-plugin',
           'migrations',
         );
 

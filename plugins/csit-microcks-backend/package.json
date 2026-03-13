@@ -1,6 +1,6 @@
 {
-  "name": "@internal/backstage-plugin-csit-microcks-backend",
-  "version": "0.1.0",
+  "name": "@bcgov/csit-microcks-backend-backstage-plugin",
+  "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
   "main": "src/index.ts",
@@ -12,7 +12,10 @@
   },
   "backstage": {
     "role": "backend-plugin",
-    "pluginId": "csit-microcks"
+    "pluginId": "csit-microcks",
+    "pluginPackages": [
+      "@bcgov/csit-microcks-backend-backstage-plugin"
+    ]
   },
   "scripts": {
     "start": "backstage-cli package start",
@@ -24,24 +27,25 @@
     "postpack": "backstage-cli package postpack"
   },
   "dependencies": {
-    "@backstage/backend-defaults": "^0.15.2",
-    "@backstage/backend-plugin-api": "^1.7.0",
-    "@backstage/catalog-client": "^1.13.0",
-    "@backstage/errors": "^1.2.7",
-    "@backstage/plugin-catalog-node": "^2.0.0",
-    "@backstage/types": "^1.2.2",
+    "@backstage/backend-defaults": "backstage:^",
+    "@backstage/backend-plugin-api": "backstage:^",
+    "@backstage/catalog-client": "backstage:^",
+    "@backstage/errors": "backstage:^",
+    "@backstage/plugin-catalog-node": "backstage:^",
+    "@backstage/types": "backstage:^",
     "express": "^4.14.0",
     "express-promise-router": "^4.1.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@backstage/backend-test-utils": "^1.11.0",
-    "@backstage/cli": "^0.35.4",
+    "@backstage/backend-test-utils": "backstage:^",
+    "@backstage/cli": "backstage:^",
     "@types/express": "^4.17.6",
     "@types/supertest": "^2.0.12",
     "supertest": "^6.2.4"
   },
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ]
 }

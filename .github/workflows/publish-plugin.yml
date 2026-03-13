@@ -1,0 +1,21 @@
+name: Publish Plugins
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Run Publish Backstage Plugins
+        uses: bcgov/aps-devops/publish-backstage-plugins@backstage
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

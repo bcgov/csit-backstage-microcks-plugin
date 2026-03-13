@@ -60,7 +60,7 @@ export class MicrocksClient {
     headers.set('Authorization', `Bearer ${token}`);
     headers.set('Accept', 'application/json');
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-client] request start method=${method} url="${url}"`,
     );
 
@@ -82,7 +82,7 @@ export class MicrocksClient {
       throw error;
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-client] request complete method=${method} url="${url}" status=${resp.status} statusText="${resp.statusText}"`,
     );
 
@@ -147,7 +147,7 @@ export class MicrocksClient {
     );
 
     if (resp.status === 404) {
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-client] delete skipped id="${serviceId}" reason=not-found`,
       );
       return;
@@ -163,7 +163,7 @@ export class MicrocksClient {
       );
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-client] deleted stale Microcks service id="${serviceId}"`,
     );
   }
@@ -198,7 +198,7 @@ export class MicrocksClient {
       );
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-client] uploaded artifact filename="${filename}" path="${filePath}" mainArtifact=${mainArtifact}`,
     );
   }
@@ -224,7 +224,7 @@ export class MicrocksClient {
     );
 
     if (metadataArtifacts.length > 0) {
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-client] metadata-first upload enabled metadataArtifacts=${metadataArtifacts
           .map(a => `"${a.filename}"`)
           .join(',')}`,
