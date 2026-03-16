@@ -15,7 +15,15 @@ jobs:
       packages: write
 
     steps:
-      - name: Run Publish Backstage Plugins
+      - name: Publish Backstage plugins
+        id: publish_plugins
         uses: bcgov/aps-devops/publish-backstage-plugins@backstage
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show publish outputs
+        shell: bash
+        run: |
+          echo "Version: ${{ steps.publish_plugins.outputs.version }}"
+          echo "Plugin count: ${{ steps.publish_plugins.outputs.plugin_count }}"
+          echo 'Published packages: ${{ steps.publish_plugins.outputs.published_package_versions }}'
