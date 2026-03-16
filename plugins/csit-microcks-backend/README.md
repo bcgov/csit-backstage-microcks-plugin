@@ -8,6 +8,181 @@ The system is intentionally designed to be **deterministic**, **observable**, an
 
 ---
 
+# Installation
+
+Install the plugin in your Backstage backend.
+
+```
+yarn add @bcgov/csit-microcks-backend-backstage-plugin
+```
+
+Register the plugin in your backend.
+
+Example (`packages/backend/src/index.ts`):
+
+```
+backend.add(import('@bcgov/csit-microcks-backend-backstage-plugin'));
+```
+
+Restart the backend after installing the plugin.
+
+---
+
+# Configuration
+
+Backstage `app-config.yaml` must define a Microcks server.
+
+Example:
+
+```
+csitMicrocks:
+  server:
+    baseUrl: https://csit-microcks-apps-gov-bc-ca.dev.api.gov.bc.ca
+    auth:
+      type: keycloak
+      issuerUrl: https://authz-b8840c-dev.apps.gold.devops.gov.bc.ca/auth/realms/aps
+      clientId: devhub-microcks-sync
+      clientSecret: ${BACKSTAGE_MICROCKS_CLIENT_SECRET}
+```
+
+If this configuration is missing:
+
+- The processor continues queuing jobs
+- The worker **will not claim jobs**
+
+---
+
+# Keycloak Service Client Configuration
+
+The backend plugin authenticates to Microcks using the **OAuth 2.0 client credentials flow** via Keycloak.
+
+A **Keycloak confidential client with a service account** must be created so the plugin can obtain access tokens.
+
+Recommended client id:
+
+```
+devhub-microcks-sync
+```
+
+The client id is configurable in `app-config.yaml`.
+
+The service client must be granted the role:
+
+```
+microcks-app → manager
+```
+
+This role allows the plugin to perform Microcks operations such as importing artifacts and managing services.
+
+---
+
+## Keycloak 26 Setup
+
+Create the client in the same Keycloak realm used by Microcks.
+
+### 1. Create the Client
+
+1. Open the **Keycloak Admin Console**
+2. Select the **Microcks realm**
+3. Navigate to **Clients**
+4. Click **Create client**
+
+Configure:
+
+Client ID
+
+```
+devhub-microcks-sync
+```
+
+Client Type
+
+```
+OpenID Connect
+```
+
+Click **Next**.
+
+Enable the following settings:
+
+- Client authentication
+- Service accounts roles
+
+Save the client.
+
+---
+
+### 2. Obtain the Client Secret
+
+1. Open the client you created
+2. Navigate to the **Credentials** tab
+3. Copy the **Client Secret**
+
+Store the secret securely. It should **not be committed to source control**.
+
+---
+
+### 3. Assign the Required Role
+
+1. Open the client
+2. Navigate to **Service Account Roles**
+3. Change the filter to **Filter by clients**
+4. Select:
+
+```
+microcks-app
+```
+
+5. Assign the role:
+
+```
+manager
+```
+
+The service client can now perform Microcks management operations.
+
+---
+
+# Entity Configuration
+
+Catalog entities enable Microcks synchronization using the annotation:
+
+```
+bcgov/microcks-config-ref
+```
+
+Example:
+
+```
+metadata:
+  annotations:
+    bcgov/microcks-config-ref: ./microcks.yaml
+```
+
+The referenced file defines one or more mocks.
+
+Example structure:
+
+```
+spec:
+  mocks:
+    - mockId: default
+      openapi:
+        path: openapi.yaml
+      artifacts:
+        - kind: examples
+          path: examples
+```
+
+Artifacts may reference:
+
+- local repository paths
+- URLs
+
+Multiple mocks per API are supported.
+
+---
+
 # Architecture
 
 ```mermaid
@@ -33,7 +208,7 @@ B --> K[(csit_microcks_sync_events)]
 E --> K
 ```
 
-### Flow Summary
+## Flow Summary
 
 1. A catalog entity references a `microcks.yaml` file.
 2. The **Catalog Processor** reads this file and records desired sync state.
@@ -154,8 +329,6 @@ MicrocksSyncJobRunner
 
 The runner performs the following steps.
 
----
-
 ### 1) Load Desired State
 
 ```
@@ -173,11 +346,7 @@ Artifacts may come from:
 - repository files
 - URLs
 
----
-
 ### 2) Scan Existing Microcks Services
-
-The runner scans Microcks for services owned by the entity.
 
 Ownership is determined using:
 
@@ -191,8 +360,6 @@ Example:
 bk-8ad514d6fc316e04-*
 ```
 
----
-
 ### 3) Reconcile Desired vs Existing
 
 `MicrocksReconciler` determines:
@@ -200,15 +367,7 @@ bk-8ad514d6fc316e04-*
 - services owned by the entity
 - exact version matches
 - services to delete
-- whether action is:
-
-```
-create
-or
-update
-```
-
----
+- whether action is `create` or `update`
 
 ### 4) Upload Artifacts
 
@@ -225,8 +384,6 @@ MicrocksArtifactIdentityStamper
 ```
 
 injects deterministic identity metadata.
-
----
 
 ### 5) Delete Stale Services
 
@@ -263,151 +420,6 @@ Example events:
 
 ---
 
-# Overview
-
-The plugin consists of two main components.
-
----
-
-## 1. Catalog Processor
-
-Class:
-
-`CsitMicrocksProcessor`
-
-Runs during Backstage catalog entity processing.
-
-### Responsibilities
-
-- Detect the annotation
-
-```
-bcgov/microcks-config-ref
-```
-
-- Load a `microcks.yaml` file from the entity repository or URL
-- Parse mock definitions
-- Compute a fingerprint of configuration inputs
-- Upsert synchronization records in the database
-- Mark removed mocks as delete operations
-- Add mock server links to the entity metadata
-
-The processor **never calls Microcks directly**.
-
-Instead it determines desired state and records synchronization jobs.
-
-The processor also records **events describing configuration changes**.
-
-Example processor events:
-
-- processor.config_loaded
-- processor.fingerprint_changed
-- processor.mock_discovered
-- processor.mock_removed
-- processor.sync_record_created
-
----
-
-## 2. Background Worker
-
-Class:
-
-`MicrocksSyncWorker`
-
-Runs periodically inside the Backstage backend.
-
-### Responsibilities
-
-- Poll the database for pending sync records
-- Claim jobs using a lease
-- Acquire authentication tokens
-- Execute reconciliation jobs
-- Handle global backoff for infrastructure failures
-
-Actual job execution is handled by:
-
-```
-MicrocksSyncJobRunner
-```
-
-This separation keeps the worker focused on **orchestration**.
-
-Worker events include:
-
-- worker.reconcile_started
-- worker.reconcile_plan
-- worker.artifact_upload_started
-- worker.service_delete_started
-- worker.reconcile_finished
-- worker.failed
-- worker.global_backoff
-
----
-
-# Configuration
-
-Backstage `app-config.yaml` must define a Microcks server.
-
-Example:
-
-```yaml
-csitMicrocks:
-  server:
-    baseUrl: https://csit-microcks-apps-gov-bc-ca.dev.api.gov.bc.ca
-    auth:
-      type: keycloak
-      issuerUrl: https://authz-b8840c-dev.apps.gold.devops.gov.bc.ca/auth/realms/aps
-      clientId: devhub-microcks-sync
-      clientSecret: ${BACKSTAGE_MICROCKS_CLIENT_SECRET}
-```
-
-If this configuration is missing:
-
-- The processor continues queuing jobs
-- The worker **will not claim jobs**
-
----
-
-# Entity Configuration
-
-Catalog entities enable Microcks synchronization using the annotation:
-
-```
-bcgov/microcks-config-ref
-```
-
-Example:
-
-```yaml
-metadata:
-  annotations:
-    bcgov/microcks-config-ref: ./microcks.yaml
-```
-
-The referenced file defines one or more mocks.
-
-Example structure:
-
-```yaml
-spec:
-  mocks:
-    - mockId: default
-      openapi:
-        path: openapi.yaml
-      artifacts:
-        - kind: examples
-          path: examples
-```
-
-Artifacts may reference:
-
-- local repository paths
-- URLs
-
-Multiple mocks per API are supported.
-
----
-
 # Versioning Model
 
 Microcks service versions are deterministic.
@@ -432,8 +444,6 @@ Ownership of services is determined by the prefix:
 bk-<entityHash>
 ```
 
-The worker scans Microcks for services with this prefix to determine ownership.
-
 ---
 
 # Reconciliation Model
@@ -444,34 +454,17 @@ Reconciliation is handled by:
 MicrocksReconciler
 ```
 
-It determines:
-
-- whether a service must be created or updated
-- which services are owned by the entity
-- which services must be deleted
-- whether an exact version already exists
-
 The worker ensures that **only the desired versions exist in Microcks**.
 
 ---
 
 # Fail Fast Behavior
 
-The system intentionally **fails fast and loud**.
+If desired state cannot be loaded:
 
-If desired state cannot be loaded (for example missing artifacts or invalid paths):
-
-The worker will:
-
-1. Record a failure event
-2. Delete all Microcks services owned by the failed mock
-3. Mark the sync record as `error`
-
-This prevents a broken configuration from leaving a stale working mock in Microcks.
-
-Cleanup **only deletes services belonging to the failed mock**.
-
-Other mocks belonging to the same API entity remain untouched.
+1. A failure event is recorded
+2. Microcks services owned by the failed mock are deleted
+3. The sync record is marked `error`
 
 ---
 
@@ -480,8 +473,6 @@ Other mocks belonging to the same API entity remain untouched.
 ## csit_microcks_sync_status
 
 Tracks synchronization jobs.
-
-Important fields:
 
 | Field | Description |
 |------|-------------|
@@ -492,13 +483,6 @@ Important fields:
 | microcks_version_id | deterministic Microcks version |
 | fingerprint_hash | processor fingerprint |
 | status | pending, completed, error |
-| attempt_count | retry count |
-| next_attempt_at | retry scheduling |
-| last_attempt_at | last execution time |
-| leased_at | worker lease start |
-| lease_expires_at | lease expiration |
-| last_success_at | last successful sync |
-| last_message | status message |
 
 ---
 
@@ -514,10 +498,6 @@ Stores detailed sync history.
 | event_type | event category |
 | level | info or error |
 | message | event message |
-| details_json | structured event details |
-| created_at | timestamp |
-
-Both the **processor** and the **worker** record events to this table.
 
 ---
 
@@ -528,11 +508,11 @@ Both the **processor** and the **worker** record events to this table.
 | `CsitMicrocksProcessor` | Reads entity configuration and queues sync jobs |
 | `MicrocksSyncWorker` | Polls database and orchestrates job execution |
 | `MicrocksSyncJobRunner` | Executes a single sync job |
-| `MicrocksDesiredStateLoader` | Loads artifacts from repositories or URLs |
+| `MicrocksDesiredStateLoader` | Loads artifacts |
 | `MicrocksClient` | Communicates with the Microcks API |
-| `MicrocksReconciler` | Determines required create/update/delete actions |
+| `MicrocksReconciler` | Determines required actions |
 | `MicrocksTokenProvider` | Handles authentication tokens |
-| `MicrocksArtifactIdentityStamper` | Injects deterministic version identity into artifacts |
+| `MicrocksArtifactIdentityStamper` | Injects deterministic artifact identity |
 | `MicrocksSyncStore` | Database access layer |
 
 ---
@@ -541,7 +521,7 @@ Both the **processor** and the **worker** record events to this table.
 
 ### Deterministic Versioning
 
-Microcks service versions are derived from entity identity and mockId.
+Microcks service versions derive from entity identity and `mockId`.
 
 ### Fail Fast Behavior
 
@@ -549,7 +529,7 @@ Invalid configuration immediately removes owned mocks.
 
 ### Explicit Ownership
 
-The entity version prefix determines service ownership.
+Service ownership is determined by the entity version prefix.
 
 ### Observable Operations
 
@@ -557,4 +537,4 @@ All actions emit events to `csit_microcks_sync_events`.
 
 ### Small Focused Components
 
-Worker orchestration, job execution, reconciliation, and storage are separated into distinct classes.
+Worker orchestration, job execution, reconciliation, and storage are separated into focused classes.

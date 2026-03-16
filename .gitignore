@@ -54,3 +54,5 @@ e2e-test-report/
 
 # Cache
 .cache/
+
+plugins/csit-microcks-backend/package.tgz

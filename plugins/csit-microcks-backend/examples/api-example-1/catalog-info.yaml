@@ -1,7 +1,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:
-  name: cra-income-verification-api
+  name: microcks-example-cra-income-verification-api
   description: Secure API for verifying individual income data from Canada Revenue Agency (CRA) records, used for eligibility and fraud prevention in BC programs.
   tags:
     - secure-data-exchange

@@ -71,7 +71,7 @@ export class MicrocksTokenProvider {
     })();
 
     try {
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-token-provider] requesting token via OIDC discovery issuer=${issuerUrl} clientId=${cfg.auth.clientId}`,
       );
 
@@ -139,7 +139,7 @@ export class MicrocksTokenProvider {
 
       this.tokenCache = { accessToken, expiresAt };
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-token-provider] obtained token issuer=${issuerUrl} clientId=${cfg.auth.clientId} expiresAt=${expiresAt}`,
       );
 

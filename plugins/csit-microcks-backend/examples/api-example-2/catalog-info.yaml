@@ -1,7 +1,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:
-  name: msp-tombstone-data-api
+  name: microcks-example-msp-tombstone-data-api
   description: Secure API for verifying MSP tombstone data, used for eligibility and fraud prevention in BC programs.
   tags:
     - secure-data-exchange

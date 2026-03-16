@@ -1,0 +1,29 @@
+name: Publish Plugins
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Publish Backstage plugins
+        id: publish_plugins
+        uses: bcgov/aps-devops/publish-backstage-plugins@dev
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show publish outputs
+        shell: bash
+        run: |
+          echo "Version: ${{ steps.publish_plugins.outputs.version }}"
+          echo "Plugin count: ${{ steps.publish_plugins.outputs.plugin_count }}"
+          echo 'Published packages: ${{ steps.publish_plugins.outputs.published_package_versions }}'

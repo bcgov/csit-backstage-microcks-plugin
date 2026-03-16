@@ -198,7 +198,7 @@ export class MicrocksDesiredStateLoader {
     let openapiText: string | undefined;
     const loadedSecondaryArtifacts: Array<{ filename: string; content: string }> = [];
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-desired-state-loader] inputs loaded entity=${entityRef} microcksSource=${microcksTarget} microcksHash=${sha256(
         microcksText,
       )} mockId=${mockId} allMockIds=${allMockIds.join(',')} artifacts=${artifacts.length}`,
@@ -215,7 +215,7 @@ export class MicrocksDesiredStateLoader {
         content: text,
       });
 
-      this.logger.info(
+      this.logger.debug(
         `[csit-microcks-desired-state-loader] artifact ok kind=${a.kind} path=${a.path} resolved=${resolved} hash=${hash}`,
       );
     }
@@ -232,12 +232,12 @@ export class MicrocksDesiredStateLoader {
         const hash = sha256(text);
         openapiText = text;
         openapiFilename = getFilenameFromTarget(resolved, openapiFilename);
-        this.logger.info(
+        this.logger.debug(
           `[csit-microcks-desired-state-loader] openapi ok source=url resolved=${resolved} hash=${hash}`,
         );
       }
     } else {
-      this.logger.info('[csit-microcks-desired-state-loader] openapi none');
+      this.logger.debug('[csit-microcks-desired-state-loader] openapi none');
     }
 
     if (!openapiText) {
@@ -272,7 +272,7 @@ export class MicrocksDesiredStateLoader {
       );
     }
 
-    this.logger.info(
+    this.logger.debug(
       `[csit-microcks-desired-state-loader] staged artifacts entity=${entityRef} mockId=${mockId} tempDir=${tempDir} mainArtifact="${mainArtifact.filename}" secondaryArtifacts=${secondaryArtifacts.length} desiredApiName="${desiredApiName}" entityName="${entityName}" allMockIds=${allMockIds.join(',')}`,
     );
 
