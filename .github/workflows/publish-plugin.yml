@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Publish Backstage plugins
         id: publish_plugins
-        uses: bcgov/aps-devops/publish-backstage-plugins@backstage
+        uses: bcgov/aps-devops/publish-backstage-plugins@dev
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
