@@ -20,6 +20,10 @@ jobs:
         uses: bcgov/aps-devops/publish-backstage-plugins@aps-4105-connect-pipelines
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          dispatch_repo: 'bcgov/csit-developer-portal-poc'
+          dispatch_token: ${{ secrets.CSIT_DEVELOPER_PORTAL_PAT }}
+          dispatch_workflow: 'build-update-gitops.yaml'
+          dispatch_branch: 'aps-4105-connect-pipelines'
 
       - name: Show publish outputs
         shell: bash
