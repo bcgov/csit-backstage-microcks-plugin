@@ -27,3 +27,4 @@ jobs:
           echo "Version: ${{ steps.publish_plugins.outputs.version }}"
           echo "Plugin count: ${{ steps.publish_plugins.outputs.plugin_count }}"
           echo 'Published packages: ${{ steps.publish_plugins.outputs.published_package_versions }}'
+          echo 'Target repo status: ${{ steps.publish_plugins.outputs.target_repo_status }}'
