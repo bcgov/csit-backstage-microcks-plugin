@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Publish Backstage plugins
         id: publish_plugins
-        uses: bcgov/aps-devops/publish-backstage-plugins@dev
+        uses: bcgov/aps-devops/publish-backstage-plugins@aps-4105-connect-pipelines
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
