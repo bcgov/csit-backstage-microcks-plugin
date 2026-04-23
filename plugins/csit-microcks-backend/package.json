@@ -5,7 +5,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bcgov/csit-backstage-microcks-poc.git",
+    "url": "git+https://github.com/bcgov/csit-backstage-microcks-plugin.git",
     "directory": "plugins/csit-microcks-backend"
   },
   "main": "src/index.ts",
