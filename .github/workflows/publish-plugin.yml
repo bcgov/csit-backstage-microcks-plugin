@@ -18,9 +18,11 @@ jobs:
     steps:
       - name: Publish Backstage plugins
         id: publish_plugins
-        uses: bcgov/aps-devops/publish-backstage-plugins@aps-4105-connect-pipelines
+        uses: bcgov/aps-devops/publish-backstage-plugins@dev
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          dispatch_repo: 'bcgov/csit-developer-portal-poc'
+          dispatch_ssh_key: ${{ secrets.CSIT_DEVELOPER_PORTAL_SSH_KEY }}
 
       - name: Show publish outputs
         shell: bash
