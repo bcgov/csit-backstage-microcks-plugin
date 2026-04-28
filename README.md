@@ -118,7 +118,7 @@ The following configuration is only required if you are pulling the packages fro
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
-### `.yarnrc.yaml` (if required)
+### `.yarnrc.yml` (if required)
 
 ```yaml
 npmScopes:
