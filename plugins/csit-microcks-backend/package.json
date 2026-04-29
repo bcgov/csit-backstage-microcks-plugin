@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bcgov/csit-backstage-microcks-plugin.git",
+    "directory": "plugins/csit-microcks-backend"
+  },
   "main": "src/index.ts",
   "types": "src/index.ts",
   "publishConfig": {

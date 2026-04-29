@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write # Required for OIDC -- https://docs.npmjs.com/trusted-publishers
 
     steps:
       - name: Publish Backstage plugins
@@ -20,6 +21,8 @@ jobs:
         uses: bcgov/aps-devops/publish-backstage-plugins@dev
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          dispatch_repo: 'bcgov/csit-developer-portal-poc'
+          dispatch_ssh_key: ${{ secrets.CSIT_DEVELOPER_PORTAL_SSH_KEY }}
 
       - name: Show publish outputs
         shell: bash
@@ -27,3 +30,4 @@ jobs:
           echo "Version: ${{ steps.publish_plugins.outputs.version }}"
           echo "Plugin count: ${{ steps.publish_plugins.outputs.plugin_count }}"
           echo 'Published packages: ${{ steps.publish_plugins.outputs.published_package_versions }}'
+          echo 'Target repo status: ${{ steps.publish_plugins.outputs.target_repo_status }}'

@@ -69,7 +69,7 @@ This allows rapid iteration without publishing packages.
 
 # Plugin Publishing
 
-Plugins in this repository are automatically published to **GitHub Packages** using a GitHub Actions workflow.
+Plugins in this repository are automatically published to **GitHub Packages** and **npmjs.org** using a [GitHub Actions workflow in the APS-DevOps repository](https://github.com/bcgov/aps-devops/blob/dev/publish-backstage-plugins/README.md).
 
 Publishing occurs when:
 
@@ -81,89 +81,60 @@ The workflow discovers all publishable plugins under `plugins/` and publishes th
 
 ---
 
-# Versioning
+## Prerequisites
 
-All plugins share the same version during a publish run.
+These packages are published to both **npmjs.org** and **GitHub Packages**.
 
-The base version is taken from the root `package.json`.
+If you are installing the packages from **npmjs.org**, no additional configuration or authentication is required.
 
-The CI workflow generates the final version as follows.
+If you choose to pull from **GitHub Packages**, follow these steps to authenticate, as it is required even for public packages:
 
-## Main branch
+### 1. Create a GitHub Personal Access Token
 
+1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click **Generate new token (classic)**
+3. Give it a descriptive name such as `Backstage Package Access`
+4. Select the `read:packages` scope
+5. Set a lifespan (90 days or less recommended)
+6. Authorize the token for SSO with the `bcgov` organization
+7. Copy the token
+
+### 2. Export the Token
+
+```bash
+export GITHUB_TOKEN=your_token_here
 ```
-<root-version-patch+1>-main.<commit-sha>
-```
-
-Example:
-
-```
-1.2.4-main.a1b2c3d4
-```
-
-## Feature branches
-
-```
-<root-version>-feature.<branch>.<commit-sha>
-```
-
-Example:
-
-```
-1.2.3-feature.add-frontend-ui.a1b2c3d4
-```
-
-This allows feature branches to publish testable plugin builds without affecting stable releases.
 
 ---
 
-# Plugin Package Configuration
+## Configure Package Registry Access (GitHub Packages Only)
 
-Each plugin `package.json` should contain:
+The following configuration is only required if you are pulling the packages from the GitHub registry instead of npmjs.org.
 
-```
-{
-  "version": "0.0.0",
-  "private": true
-}
-```
-
-During publishing the CI workflow:
-
-1. Computes a shared release version
-2. Updates each plugin's `package.json`
-3. Removes `"private": true`
-4. Builds the plugin
-5. Packs the plugin
-6. Publishes it to GitHub Packages
-
-Before publishing begins:
-
-- All plugins must build successfully
-- Target versions must not already exist
-- Packages are packed first to verify publish artifacts
-
-Publishing only begins after all checks pass.
-
----
-
-# GitHub Packages Configuration
-
-Consumers must configure npm to use the GitHub Packages registry.
-
-Add this to `.npmrc`:
+### `.npmrc`
 
 ```
 @bcgov:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
-Authentication with a GitHub token is required.
+### `.yarnrc.yml` (if required)
+
+```yaml
+npmScopes:
+  bcgov:
+    npmRegistryServer: "https://npm.pkg.github.com"
+
+npmRegistries:
+  "https://npm.pkg.github.com":
+    npmAuthToken: "${GITHUB_TOKEN:-}"
+```
 
 ---
 
 # Installing Plugins
 
-Plugins are published to **GitHub Packages**.
+Plugins are published to **GitHub Packages** and **npmjs.org**.
 
 The GitHub Actions workflow prints the exact install command in the run summary.
 
@@ -190,19 +161,19 @@ If a publish fails or a package cannot be installed, the following checks can he
 ## Verify the Package Exists
 
 ```
-npm view @bcgov/<plugin-name>@<version> --registry=https://npm.pkg.github.com
+npm view @bcgov/<plugin-name>@<version>
 ```
 
 Example:
 
 ```
-npm view @bcgov/csit-microcks-backend-backstage-plugin@1.2.4-feature.my-branch.a1b2c3d4 --registry=https://npm.pkg.github.com
+npm view @bcgov/csit-microcks-backend-backstage-plugin@1.2.4-feature.my-branch.a1b2c3d4
 ```
 
 ## Inspect the Published Package
 
 ```
-npm pack @bcgov/<plugin-name>@<version> --registry=https://npm.pkg.github.com
+npm pack @bcgov/<plugin-name>@<version>
 ```
 
 This downloads the exact tarball that was published so you can inspect its contents.
